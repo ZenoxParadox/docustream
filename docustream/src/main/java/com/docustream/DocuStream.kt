@@ -1,16 +1,17 @@
 package com.docustream
 
 import android.content.Context
-import android.os.Environment
-import android.os.storage.StorageManager
 import android.support.annotation.VisibleForTesting
 import android.util.Log
+import com.docustream.encryption.DataCipher
 import com.google.gson.Gson
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
+import java.nio.charset.StandardCharsets
+
 
 private const val LOG_TAG = "DocuStream"
 private const val DEFAULT_FILENAME = "document_storage"
@@ -25,17 +26,27 @@ private const val DEFAULT_DATA = "{}"
  *   data<T> {}
  * }
  *
+ * TODO:
+ * - session storage (make use of common package)
+ * - Encryption;
+ *      - Keystore API 18+
+ * - migration (versioning?)
+ * - listeners -> what type? non-invasive method?
+ *
+ * Done:
+ * - File location (should it be optional? /data/data/[package]/files/[fileName])
+ * - Encryption;
+ *      - internal storage (private + no permissions)
  * Created by Killian on 23/01/2018.
  */
 class DocuStream<T : Any>(
         context: Context,
         private val directory: File = context.filesDir,
         private val fileName: String = DEFAULT_FILENAME,
+        private val cipher: DataCipher? = null,
         private val rootType: Class<T>) {
 
-    private val gson by lazy { Gson() }
-
-    private lateinit var data: T
+    private val gson: Gson by lazy { Gson() }
 
     init {
         // Make sure we're dealing with application context
@@ -49,7 +60,14 @@ class DocuStream<T : Any>(
         val file = File(directory, fileName)
         if (!file.exists()) {
             file.createNewFile()
-            file.writeText(DEFAULT_DATA)
+
+            // default data depends (strangely enough) on encryption
+            if (cipher == null) {
+                file.writeText(DEFAULT_DATA)
+            } else {
+                val encryptedDefault = cipher.encrypt(DEFAULT_DATA)
+                file.writeText(encryptedDefault)
+            }
         }
 
         return file
@@ -61,14 +79,8 @@ class DocuStream<T : Any>(
     }
 
     private fun getReadableFile(): BufferedReader {
-        val fileReader = FileReader(getFile())
-        return BufferedReader(fileReader)
-    }
-
-    private fun save() {
-        val writer = getWritableFile()
-        gson.toJson(data, writer)
-        writer.close()
+        val file = getFile()
+        return BufferedReader(FileReader(file))
     }
 
     /**
@@ -76,6 +88,13 @@ class DocuStream<T : Any>(
      */
     fun getData(): T {
         val reader = getReadableFile()
+
+        if (cipher != null) {
+            val encryptedJson = getFileContents()
+            val rawJson = cipher.decrypt(encryptedJson)
+            return gson.fromJson(rawJson, rootType)
+        }
+
         return gson.fromJson(reader, rootType)
     }
 
@@ -83,8 +102,17 @@ class DocuStream<T : Any>(
      * Set the data to be stored.
      */
     fun setData(data: T) {
-        this.data = data
-        save()
+        val writer = getWritableFile()
+
+        if (cipher != null) {
+            val rawJson = gson.toJson(data)
+            val encryptedJson = cipher.encrypt(rawJson)
+            writer.write(encryptedJson)
+        } else {
+            gson.toJson(data, writer)
+        }
+
+        writer.close()
     }
 
     /**
@@ -95,6 +123,18 @@ class DocuStream<T : Any>(
         val success = file.delete()
         Log.w(LOG_TAG, "file [${file.name}] deleted. success = $success")
         return success
+    }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    fun getFileContents(): String {
+        val file = getFile()
+
+        val builder = StringBuilder()
+        for (line in file.readLines(StandardCharsets.UTF_8)) {
+            builder.append(line)
+        }
+
+        return builder.toString()
     }
 
 }

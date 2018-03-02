@@ -31,8 +31,6 @@ class SampleApplication : Application() {
         // retrieved state
         val savedInstance = stream.getData()
         Log.i(LOG_TAG, "after -> ${savedInstance.variable}")
-
-        stream.getFile()
     }
 
 }
