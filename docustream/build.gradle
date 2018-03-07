@@ -31,5 +31,6 @@ dependencies {
     androidTestCompile 'com.android.support:support-annotations:26.1.0'
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'com.madgag.spongycastle:bctls-jdk15on:1.58.0.0'
 }
 apply plugin: 'kotlin-android-extensions'

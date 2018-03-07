@@ -62,11 +62,13 @@ class DocuStream<T : Any>(
             file.createNewFile()
 
             // default data depends (strangely enough) on encryption
-            if (cipher == null) {
-                file.writeText(DEFAULT_DATA)
-            } else {
-                val encryptedDefault = cipher.encrypt(DEFAULT_DATA)
+            if (cipher != null) {
+                val bytes = cipher.generateVectorBytes()
+                val encryptedDefault = cipher.encrypt(DEFAULT_DATA, bytes)
                 file.writeText(encryptedDefault)
+                cipher.saveVectorBytes(bytes)
+            } else {
+                file.writeText(DEFAULT_DATA)
             }
         }
 
@@ -90,8 +92,10 @@ class DocuStream<T : Any>(
         val reader = getReadableFile()
 
         if (cipher != null) {
+            val bytes = cipher.getVectorBytes()
+
             val encryptedJson = getFileContents()
-            val rawJson = cipher.decrypt(encryptedJson)
+            val rawJson = cipher.decrypt(encryptedJson, bytes)
             return gson.fromJson(rawJson, rootType)
         }
 
@@ -105,9 +109,13 @@ class DocuStream<T : Any>(
         val writer = getWritableFile()
 
         if (cipher != null) {
+            val bytes = cipher.generateVectorBytes()
+
             val rawJson = gson.toJson(data)
-            val encryptedJson = cipher.encrypt(rawJson)
+            val encryptedJson = cipher.encrypt(rawJson, bytes)
             writer.write(encryptedJson)
+
+            cipher.saveVectorBytes(bytes)
         } else {
             gson.toJson(data, writer)
         }
