@@ -3,34 +3,33 @@ package com.docustream.sample
 import android.app.Application
 import android.util.Log
 import com.docustream.DocuStream
-import com.docustream.model.Example
+import com.docustream.encryption.DataCipher
+import com.docustream.sample.model.User
 
+
+private const val ALIAS = "example"
 private const val LOG_TAG = "SampleApplication"
 /**
+ * df
+ *
  * Created by Killian on 19/01/2018.
  */
 class SampleApplication : Application() {
 
-    lateinit var stream: DocuStream<Example>
+    lateinit var stream: DocuStream<User>
 
     override fun onCreate() {
         super.onCreate()
 
-        stream = DocuStream(this, rootType = Example::class.java)
-        val instance = stream.getData()
+        val cipher = DataCipher(this)
+        stream = DocuStream(this, cipher = cipher, rootType = User::class.java)
+        try {
+            stream.getData()
+        } catch (e: Exception){
+            Log.w(LOG_TAG, e.message, e)
+            stream.reset()
+        }
 
-        // default value
-        Log.i(LOG_TAG, "before -> ${instance.variable}")
-        instance.variable= "new"
-
-        // changed instance state
-        Log.i(LOG_TAG, "before -> ${instance.variable}")
-
-        stream.setData(instance)
-
-        // retrieved state
-        val savedInstance = stream.getData()
-        Log.i(LOG_TAG, "after -> ${savedInstance.variable}")
     }
 
 }

@@ -6,7 +6,7 @@ package com.docustream.sample.model
  * Created by Killian on 19/01/2018.
  */
 data class User(
-        val name: String = "",
-        val age: Int = 0,
-        val favoriteColor: String = ""
+        var name: String = "",
+        var age: Int = 0,
+        var favoriteColor: String = ""
 )

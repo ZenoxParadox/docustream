@@ -1,14 +1,16 @@
 package com.docustream.encryption
 
+import android.content.Context
 import android.util.Base64
 import android.util.Log
+import hugo.weaving.DebugLog
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+
 
 private const val LOG_TAG = "DataCipher"
 
@@ -16,11 +18,10 @@ const val KEYSPEC_ALGORITHM = "AES"
 const val CIPHER_ALGORITHM = "AES/CBC/PKCS5PADDING"
 
 private const val MINIMUM_KEY_SIZE = 16
-
-private const val SECRET_ALIAS = "SECRET_ALIAS"
-private const val VECTOR_ALIAS = "VECTOR_ALIAS"
-
 private const val SECRET_KEY_SIZE = 256
+
+private const val SECRET_ALIAS = "SECRET"
+private const val VECTOR_ALIAS = "VECTOR"
 
 /**
  * [vectorSpec] should be random each time you encrypt/decrypt a message. Therefore the value should
@@ -30,6 +31,7 @@ private const val SECRET_KEY_SIZE = 256
  * Created by Killian on 02/03/2018.
  */
 class DataCipher(
+        context: Context,
         private val keySpecAlgorithm: String = KEYSPEC_ALGORITHM,
         cipherAlgorithm: String = CIPHER_ALGORITHM
 ) {
@@ -44,7 +46,21 @@ class DataCipher(
     private val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
 
     init {
-        keyStore.load(null) // loads the package contents
+        Log.d(LOG_TAG, "keyStore.type: ${keyStore.type}")
+        Log.d(LOG_TAG, "keyStore.provider: ${keyStore.provider}")
+
+//        val stream = context.resources.openRawResource(R.raw.example)
+//        keyStore.load(stream, "example".toCharArray())
+        keyStore.load(null)
+
+        Log.d(LOG_TAG, "----------")
+        Log.d(LOG_TAG, "alias count: ${keyStore.aliases().asSequence().count()}")
+        for (alias in keyStore.aliases()) {
+            Log.v(LOG_TAG, "alias: $alias")
+        }
+        Log.d(LOG_TAG, "----------")
+
+        //keyStore.load(null) // loads the package contents
 
         if (!hasKey(SECRET_ALIAS)) {
             val generator = KeyGenerator.getInstance(keySpecAlgorithm)
@@ -74,18 +90,25 @@ class DataCipher(
     /**
      * secret key is once generated and will never change.
      */
+    @DebugLog
     private fun getBytes(alias: String): ByteArray {
         if (!hasKey(alias)) {
-            throw IllegalArgumentException("Don't have this key")
+            throw IllegalArgumentException("Don't have key $alias. This is an implementation issue!")
         }
         val entry = keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry
         return entry.secretKey.encoded
     }
 
+    @DebugLog
     fun getVectorBytes(): ByteArray {
-        return getBytes(VECTOR_ALIAS)
+        if (hasKey(VECTOR_ALIAS)) {
+            return getBytes(VECTOR_ALIAS)
+        }
+
+        return generateVectorBytes()
     }
 
+    @DebugLog
     fun generateVectorBytes(): ByteArray {
         val bytes = ByteArray(MINIMUM_KEY_SIZE)
         val random = SecureRandom()
@@ -98,6 +121,7 @@ class DataCipher(
      * new bytes and not bytes previously used. We are assuming (of course) that they are in fact
      * never used if they are different.
      */
+    @DebugLog
     fun saveVectorBytes(bytes: ByteArray) {
         try {
             if (isNew(bytes)) {
@@ -115,6 +139,7 @@ class DataCipher(
      */
     @Throws(IllegalArgumentException::class)
     private fun isNew(newVectorBytes: ByteArray): Boolean {
+        Log.i(LOG_TAG, "isNew($newVectorBytes)")
         if (hasKey(VECTOR_ALIAS)) {
             val previousBytes = getVectorBytes()
 
@@ -127,6 +152,8 @@ class DataCipher(
     }
 
     fun encrypt(value: String, vectorBytes: ByteArray): String {
+        Log.i(LOG_TAG, "encrypt($value)")
+
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, IvParameterSpec(vectorBytes))
 
         val encrypted = cipher.doFinal(value.toByteArray())
@@ -134,6 +161,8 @@ class DataCipher(
     }
 
     fun decrypt(value: String, vectorBytes: ByteArray): String {
+        Log.i(LOG_TAG, "decrypt($value)")
+
         cipher.init(Cipher.DECRYPT_MODE, keySpec, IvParameterSpec(vectorBytes))
 
         val decryptedBytes = cipher.doFinal(Base64.decode(value, Base64.DEFAULT))

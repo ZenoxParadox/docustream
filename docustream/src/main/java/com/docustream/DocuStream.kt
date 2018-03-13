@@ -5,12 +5,14 @@ import android.support.annotation.VisibleForTesting
 import android.util.Log
 import com.docustream.encryption.DataCipher
 import com.google.gson.Gson
+import org.spongycastle.jsse.provider.BouncyCastleJsseProvider
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.nio.charset.StandardCharsets
+import java.security.Security
 
 
 private const val LOG_TAG = "DocuStream"
@@ -49,6 +51,8 @@ class DocuStream<T : Any>(
     private val gson: Gson by lazy { Gson() }
 
     init {
+        Security.addProvider(BouncyCastleJsseProvider())
+
         // Make sure we're dealing with application context
         val applicationContext = context.applicationContext
         if (context != applicationContext) {

@@ -1,5 +1,6 @@
 package com.docustream
 
+import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
@@ -10,15 +11,17 @@ import com.docustream.model.Example
 import com.docustream.model.Priority
 import com.docustream.model.SubItem
 import com.docustream.model.TinyObject
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
-
-import org.junit.Assert.*
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.KeyStore
 import javax.crypto.KeyGenerator
-import android.security.keystore.KeyGenParameterSpec
 
 /**
  * Created by Killian on 24/01/2018.
@@ -144,6 +147,7 @@ class DocuStreamTest {
     /* ********** [ HUGE DATA AMOUNT / PERFORMANCE ] ********** */
 
     // ~5 seconds for 1.000.000 items
+    @Ignore
     @Test(timeout = 6000)
     fun d1_getDefaultValueFromBigObject() {
         val storage = DocuStream(context.applicationContext, rootType = Container::class.java)
@@ -201,6 +205,7 @@ class DocuStreamTest {
     5.000 = ~100ms
     10.000 = 870ms
      */
+    @Ignore
     @Test(timeout = 15000)
     fun f2_performanceTestInitialisation() {
         val key = "Bar12345Bar12345" // 128 bit key
