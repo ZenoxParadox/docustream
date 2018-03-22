@@ -2,9 +2,12 @@ package com.docustream.sample.activity
 
 import android.app.Activity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import com.docustream.sample.R
+import com.docustream.sample.SampleApplication
+import com.google.gson.GsonBuilder
 
 private const val LOG_TAG = "MainActivity"
 
@@ -19,20 +22,36 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-//        val app = applicationContext as SampleApplication
-//        val user = app.stream.getData()
-//
-//        etName.setText(user.name)
-//        etAge.setText(user.age.toString())
-//        etColor.setText(user.favoriteColor)
-//
-//        buttonSave.setOnClickListener { v ->
-//            user.name = etName.text.toString()
-//            user.age = etAge.text.toString().toInt()
-//            user.favoriteColor = etColor.text.toString()
-//
-//            app.stream.setData(user)
-//        }
+        val app = applicationContext as SampleApplication
+        val user = app.stream.getData()
+
+        etName.setText(user.name)
+        etAge.setText(user.age.toString())
+        etColor.setText(user.favoriteColor)
+
+        Log.v(LOG_TAG, "rawContents: ${app.stream.getFileContents()}")
+
+        buttonSave.setOnClickListener { v ->
+            user.name = etName.text.toString()
+
+            val ageInput = etAge.text.toString()
+            if (ageInput.isEmpty()) {
+                user.age = 0
+            } else {
+                user.age = ageInput.toInt()
+            }
+
+            user.favoriteColor = etColor.text.toString()
+
+            app.stream.setData(user)
+
+            val rawContents = app.stream.getFileContents()
+            Log.v(LOG_TAG, "rawContents: $rawContents")
+
+            val gson = GsonBuilder().setPrettyPrinting().create()
+            val json = gson.toJson(user)
+            Log.v(LOG_TAG, json)
+        }
 
 
     }

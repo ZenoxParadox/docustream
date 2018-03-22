@@ -7,8 +7,8 @@ import com.docustream.encryption.DataCipher
 import com.docustream.sample.model.User
 
 
-private const val ALIAS = "example"
 private const val LOG_TAG = "SampleApplication"
+
 /**
  * df
  *
@@ -22,8 +22,8 @@ class SampleApplication : Application() {
         super.onCreate()
 
         val cipher = DataCipher(this)
-        stream = DocuStream(this, cipher = cipher, rootType = User::class.java)
         try {
+            stream = DocuStream(this, cipher = cipher, rootType = User::class.java)
             stream.getData()
         } catch (e: Exception){
             Log.w(LOG_TAG, e.message, e)

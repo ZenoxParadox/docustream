@@ -3,20 +3,18 @@ package com.docustream
 import android.content.Context
 import android.support.annotation.VisibleForTesting
 import android.util.Log
-import com.docustream.encryption.DataCipher
+import com.docustream.encryption.Scrambler
 import com.google.gson.Gson
-import org.spongycastle.jsse.provider.BouncyCastleJsseProvider
+import com.google.gson.GsonBuilder
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.nio.charset.StandardCharsets
-import java.security.Security
 
 
 private const val LOG_TAG = "DocuStream"
-private const val DEFAULT_FILENAME = "document_storage"
 private const val DEFAULT_DATA = "{}"
 
 /**
@@ -44,34 +42,42 @@ private const val DEFAULT_DATA = "{}"
 class DocuStream<T : Any>(
         context: Context,
         private val directory: File = context.filesDir,
-        private val fileName: String = DEFAULT_FILENAME,
-        private val cipher: DataCipher? = null,
-        private val rootType: Class<T>) {
+        private val rootType: Class<T>,
+        private val fileName: String = rootType.simpleName,
+        private val cipher: Scrambler? = null) {
 
-    private val gson: Gson by lazy { Gson() }
+    private val gson: Gson by lazy { GsonBuilder().disableHtmlEscaping().create() }
 
     init {
-        Security.addProvider(BouncyCastleJsseProvider())
-
         // Make sure we're dealing with application context
         val applicationContext = context.applicationContext
         if (context != applicationContext) {
             throw IllegalArgumentException("Context must be of application!")
         }
+
+        //Thread.setDefaultUncaughtExceptionHandler(this)
     }
 
     private fun getFile(): File {
+        //Log.i(LOG_TAG, "getFile($fileName)")
+
         val file = File(directory, fileName)
-        if (!file.exists()) {
+        val exists = file.exists()
+        //Log.v(LOG_TAG, "file [$fileName] exists: $exists")
+
+        if (!exists) {
             file.createNewFile()
+            //Log.v(LOG_TAG, "file [${file.name}] created.")
 
             // default data depends (strangely enough) on encryption
             if (cipher != null) {
-                val bytes = cipher.generateVectorBytes()
-                val encryptedDefault = cipher.encrypt(DEFAULT_DATA, bytes)
+                val vector = cipher.generateVector()
+                val encryptedDefault = cipher.encrypt(DEFAULT_DATA, vector)
+                //Log.v(LOG_TAG, "writing encrypted default data [$encryptedDefault]")
                 file.writeText(encryptedDefault)
-                cipher.saveVectorBytes(bytes)
+                cipher.setVector(vector)
             } else {
+                //Log.v(LOG_TAG, "writing plain default data [$DEFAULT_DATA]")
                 file.writeText(DEFAULT_DATA)
             }
         }
@@ -93,15 +99,21 @@ class DocuStream<T : Any>(
      * Get the data from the top level element defined in the constructor.
      */
     fun getData(): T {
+        Log.i(LOG_TAG, "getData($fileName)")
         val reader = getReadableFile()
 
         if (cipher != null) {
-            val bytes = cipher.getVectorBytes()
-
             val encryptedJson = getFileContents()
-            val rawJson = cipher.decrypt(encryptedJson, bytes)
+            val vector = cipher.getVector()
+            val rawJson = cipher.decrypt(encryptedJson, vector)
             return gson.fromJson(rawJson, rootType)
         }
+
+        //Log.d(LOG_TAG, "reader: $reader")
+        //Log.d(LOG_TAG, "rootType: $rootType")
+
+        //val raw = getFileContents()
+        //Log.v(LOG_TAG, "raw: $raw")
 
         return gson.fromJson(reader, rootType)
     }
@@ -110,16 +122,15 @@ class DocuStream<T : Any>(
      * Set the data to be stored.
      */
     fun setData(data: T) {
+        Log.i(LOG_TAG, "setData($fileName)")
         val writer = getWritableFile()
 
         if (cipher != null) {
-            val bytes = cipher.generateVectorBytes()
-
             val rawJson = gson.toJson(data)
-            val encryptedJson = cipher.encrypt(rawJson, bytes)
+            val vector = cipher.generateVector()
+            val encryptedJson = cipher.encrypt(rawJson, vector)
             writer.write(encryptedJson)
-
-            cipher.saveVectorBytes(bytes)
+            cipher.setVector(vector)
         } else {
             gson.toJson(data, writer)
         }
@@ -130,11 +141,19 @@ class DocuStream<T : Any>(
     /**
      * Reset the file by removing it. This will delete all settings.
      */
-    fun reset(): Boolean {
+    fun reset(): Int {
+        Log.i(LOG_TAG, "reset()")
         val file = getFile()
-        val success = file.delete()
-        Log.w(LOG_TAG, "file [${file.name}] deleted. success = $success")
-        return success
+        val fileRemoved = file.delete()
+        Log.w(LOG_TAG, "file [${file.name}] deleted. success = $fileRemoved")
+
+        if (cipher == null) {
+            Log.v(LOG_TAG, "No cipher.")
+        } else {
+            return cipher.reset()
+        }
+
+        return if (fileRemoved) 1 else 0
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
