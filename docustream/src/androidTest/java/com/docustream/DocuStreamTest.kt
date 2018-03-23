@@ -1,7 +1,5 @@
 package com.docustream
 
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.Log
@@ -18,7 +16,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.KeyStore
@@ -174,7 +171,7 @@ class DocuStreamTest {
     /* ********** [ HUGE DATA AMOUNT / PERFORMANCE ] ********** */
 
     // ~5 seconds for 1.000.000 items
-    @Test(timeout = 6000)
+    @Test(timeout = 10_000)
     fun d1_getDefaultValueFromBigObject() {
         val storage = DocuStream(context.applicationContext, rootType = Container::class.java)
         val container = storage.getData()
@@ -185,7 +182,7 @@ class DocuStreamTest {
         }
 
         container.items?.let { items ->
-            for (i in 1..100000) {
+            for (i in 1..100_000) {
                 val item = SubItem(body = i.toString())
                 items.add(item)
             }
@@ -205,26 +202,6 @@ class DocuStreamTest {
 //
 //    }
 
-    /* ********** [ Encryption ] ********** */
-
-//    @Ignore(value = "No longer relevant; the key is generated")
-//    @Test(expected = IllegalArgumentException::class)
-//    fun f1_minimalLength() {
-//        // Both of these keys have an invalid length (needs multiple of 16)
-//        DataCipher()
-//
-//        // No assertion!
-//    }
-//
-//    @Ignore(value = "No longer relevant; the key is generated")
-//    @Test(expected = IllegalArgumentException::class)
-//    fun f1_noLength() {
-//        // Both of these keys have an invalid length (needs multiple of 16)
-//        DataCipher()
-//
-//        // No assertion!
-//    }
-
     // https://dri.es/files/oopsla07-georges.pdf
 
     /*
@@ -232,7 +209,7 @@ class DocuStreamTest {
     10.000 = 870ms
     // TODO check appropriate timeout
      */
-    @Test(timeout = 15000)
+    @Test(timeout = 15_000)
     fun f2_performanceTestInitialisation() {
         var cipher: DataCipher? = null
 
@@ -473,7 +450,7 @@ class DocuStreamTest {
         assertFalse(foundIssues)
     }
 
-    @Test
+    @Test(timeout = 6_000)
     fun g8_testBlocksizeLimit() {
         val digits = "1234567890 "
 
@@ -482,7 +459,7 @@ class DocuStreamTest {
 
         val data = storage.getData()
 
-        for (i in 0..1_000_000 step 100_000) {
+        for (i in 0..1_000_000 step 200_000) {
             data.contents = digits.repeat(i)
             val plainSize = data.contents.length
             storage.setData(data)
@@ -496,27 +473,8 @@ class DocuStreamTest {
 
     /* ********** [ Initialize encryption ] ********** */
 
-    @Ignore("NoClassDefFoundError")
     @Test
-    fun h1_randomSecret() {
-
-        // API 19:
-        val keySpecBuilder = KeyGenParameterSpec.Builder("alias", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-        keySpecBuilder.setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-        keySpecBuilder.setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-
-        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES)
-        keyGenerator.init(keySpecBuilder.build())
-
-        for(i in 0..100) {
-            val key = keyGenerator.generateKey()
-            Log.d(LOG_TAG("h1-key"), "key: $key")
-        }
-
-    }
-
-    @Test
-    fun h2_random() {
+    fun h1_random() {
         val cipher = DataCipher(context.applicationContext)
         var issue = false
 
@@ -528,7 +486,7 @@ class DocuStreamTest {
             val encrypted = cipher.encrypt(raw, bytes)
             val decrypted = cipher.decrypt(encrypted, bytes)
 
-            Log.d(LOG_TAG("h2-raw-encrypted-decrypted-$iteration"), "$raw->$decrypted. encrypted: $encrypted")
+            Log.d(LOG_TAG("h1-raw-encrypted-decrypted-$iteration"), "$raw->$decrypted. encrypted: $encrypted")
 
             if (!raw.contentEquals(decrypted)) {
                 issue = true
@@ -539,7 +497,7 @@ class DocuStreamTest {
     }
 
     @Test
-    fun h3_generatePrivateKey() {
+    fun h2_generatePrivateKey() {
         val generator = KeyGenerator.getInstance("AES")
         generator.init(16)
         val privateKey = generator.generateKey()
@@ -549,34 +507,34 @@ class DocuStreamTest {
     }
 
     @Test
-    fun h4_random() {
+    fun h3_random() {
         val keyStore = KeyStore.getInstance("AndroidKeyStore")
         keyStore.load(null)
         val aliases = keyStore.aliases()
         var count = 0
 
         for (alias in aliases) {
-            Log.d(LOG_TAG("h4-alias"), alias)
+            Log.d(LOG_TAG("h3-alias"), alias)
             count++
         }
 
         if (count == 0) {
-            Log.w(LOG_TAG("h4-alias"), "no aliases")
+            Log.w(LOG_TAG("h3-alias"), "no aliases")
         }
     }
 
     @Test
-    fun h5_storeAndRetrieveValueFromKeyStore() {
+    fun h4_storeAndRetrieveValueFromKeyStore() {
         val keyAlias = "FILE_ENCRYPTION"
 
         val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
         keyStore.load(null) // load package
-        Log.d(LOG_TAG("h5-keyStore.size"), "${keyStore.size()}")
+        Log.d(LOG_TAG("h4-keyStore.size"), "${keyStore.size()}")
 
         val generator = KeyGenerator.getInstance("AES")
         generator.init(265)
         val secretKey = generator.generateKey()
-        Log.d(LOG_TAG("h5-secretKey"), "${secretKey.encoded}")
+        Log.d(LOG_TAG("h4-secretKey"), "${secretKey.encoded}")
 
         // ----- setEntry(String alias, Entry entry, ProtectionParameter)
         keyStore.setEntry(keyAlias, KeyStore.SecretKeyEntry(secretKey), null)
@@ -584,26 +542,26 @@ class DocuStreamTest {
         // ----- setKeyEntry(alias, byte[] key, Certificate[] chain)
         //keyStore.setKeyEntry(keyAlias, secretKey.encoded, null)
         val hasAlias = keyStore.containsAlias(keyAlias)
-        Log.d(LOG_TAG("h5-hasAlias"), "$hasAlias")
+        Log.d(LOG_TAG("h4-hasAlias"), "$hasAlias")
 
         // ----- setKeyEntry(String alias, Key key, char[] password, Certificate[] chain)
 
         val entry = keyStore.getEntry(keyAlias, null) as KeyStore.SecretKeyEntry
         val secretKeyLoaded = entry.secretKey
-        Log.d(LOG_TAG("h5-secretKeyLoaded"), "${secretKeyLoaded.encoded}")
+        Log.d(LOG_TAG("h4-secretKeyLoaded"), "${secretKeyLoaded.encoded}")
 
         //val decoded = Base64.encodeToString(entry.secretKey.encoded, Base64.DEFAULT)
         //Log.d(LOG_TAG("h5-decoded"), decoded)
 
         val encodedEquals = secretKey.encoded.contentEquals(secretKeyLoaded.encoded)
-        Log.d(LOG_TAG("h5-encodedEquals"), "$encodedEquals")
+        Log.d(LOG_TAG("h4-encodedEquals"), "$encodedEquals")
 
         assertEquals(secretKey, secretKeyLoaded)
         assertArrayEquals(secretKey.encoded, entry.secretKey.encoded)
     }
 
     @Test
-    fun h6_generatedKeyDiffersEachTime() {
+    fun h5_generatedKeyDiffersEachTime() {
         val cipher = DataCipher(context.applicationContext)
         var issue = false
 
@@ -615,7 +573,7 @@ class DocuStreamTest {
             val encrypted = cipher.encrypt(raw, bytes)
             val decrypted = cipher.decrypt(encrypted, bytes)
 
-            Log.d(LOG_TAG("h6-raw-encrypted-decrypted-$iteration"), "$raw->$decrypted. encrypted=$encrypted")
+            Log.d(LOG_TAG("h5-raw-encrypted-decrypted-$iteration"), "$raw->$decrypted. encrypted=$encrypted")
 
             if (!decrypted.contentEquals(raw)) {
                 issue = true
@@ -626,7 +584,7 @@ class DocuStreamTest {
     }
 
     @Test
-    fun h7_encryptedValuesDiffer() {
+    fun h6_encryptedValuesDiffer() {
         val cipher = DataCipher(context.applicationContext)
         val encryptedValues = mutableSetOf<String>()
         var foundIssues = false
@@ -638,7 +596,7 @@ class DocuStreamTest {
             val bytes = cipher.generateVector()
 
             val encrypted = cipher.encrypt(valueToEncrypt, bytes)
-            Log.d(LOG_TAG("h7-encrypted-$iteration"), encrypted)
+            Log.d(LOG_TAG("h6-encrypted-$iteration"), encrypted)
 
             if (encryptedValues.contains(encrypted)) {
                 foundIssues = true

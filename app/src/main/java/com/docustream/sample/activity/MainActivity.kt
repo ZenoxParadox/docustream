@@ -7,7 +7,6 @@ import android.widget.Button
 import android.widget.EditText
 import com.docustream.sample.R
 import com.docustream.sample.SampleApplication
-import com.google.gson.GsonBuilder
 
 private const val LOG_TAG = "MainActivity"
 
@@ -47,12 +46,7 @@ class MainActivity : Activity() {
 
             val rawContents = app.stream.getFileContents()
             Log.v(LOG_TAG, "rawContents: $rawContents")
-
-            val gson = GsonBuilder().setPrettyPrinting().create()
-            val json = gson.toJson(user)
-            Log.v(LOG_TAG, json)
         }
-
 
     }
 }

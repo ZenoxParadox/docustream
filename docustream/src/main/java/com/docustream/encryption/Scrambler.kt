@@ -9,13 +9,11 @@ interface Scrambler {
 
     fun generateVector(): ByteArray
 
-    fun getVector(): ByteArray
-
     fun setVector(plainBytes: ByteArray)
 
     fun encrypt(raw: String, vector: ByteArray): String
 
-    fun decrypt(encrypted: String, vector: ByteArray): String
+    fun decrypt(encrypted: String): String
 
     fun reset(): Int
 

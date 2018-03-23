@@ -13,30 +13,18 @@ import java.io.FileReader
 import java.io.FileWriter
 import java.nio.charset.StandardCharsets
 
-
 private const val LOG_TAG = "DocuStream"
 private const val DEFAULT_DATA = "{}"
 
 /**
- * session: tokens. a few standard fields backed up with an optional model
- * data: any model structure you want. schemaless in json
- *
- * documentstream: {
- *   session<T>: {}
- *   data<T> {}
- * }
+ * Document storage with any logic on your side. It's basically a JSON (de-)serializer that
+ * encrypts itself using RSA (for keys) and AES (for the data) encryption.
  *
  * TODO:
- * - session storage (make use of common package)
- * - Encryption;
- *      - Keystore API 18+
  * - migration (versioning?)
+ *      - OS Update; all of the sudden the RSA master key can differ.
  * - listeners -> what type? non-invasive method?
  *
- * Done:
- * - File location (should it be optional? /data/data/[package]/files/[fileName])
- * - Encryption;
- *      - internal storage (private + no permissions)
  * Created by Killian on 23/01/2018.
  */
 class DocuStream<T : Any>(
@@ -50,34 +38,25 @@ class DocuStream<T : Any>(
 
     init {
         // Make sure we're dealing with application context
-        val applicationContext = context.applicationContext
-        if (context != applicationContext) {
+        if (context != context.applicationContext) {
             throw IllegalArgumentException("Context must be of application!")
         }
-
-        //Thread.setDefaultUncaughtExceptionHandler(this)
     }
 
     private fun getFile(): File {
-        //Log.i(LOG_TAG, "getFile($fileName)")
-
         val file = File(directory, fileName)
         val exists = file.exists()
-        //Log.v(LOG_TAG, "file [$fileName] exists: $exists")
 
         if (!exists) {
             file.createNewFile()
-            //Log.v(LOG_TAG, "file [${file.name}] created.")
 
             // default data depends (strangely enough) on encryption
             if (cipher != null) {
                 val vector = cipher.generateVector()
                 val encryptedDefault = cipher.encrypt(DEFAULT_DATA, vector)
-                //Log.v(LOG_TAG, "writing encrypted default data [$encryptedDefault]")
                 file.writeText(encryptedDefault)
                 cipher.setVector(vector)
             } else {
-                //Log.v(LOG_TAG, "writing plain default data [$DEFAULT_DATA]")
                 file.writeText(DEFAULT_DATA)
             }
         }
@@ -96,33 +75,9 @@ class DocuStream<T : Any>(
     }
 
     /**
-     * Get the data from the top level element defined in the constructor.
-     */
-    fun getData(): T {
-        Log.i(LOG_TAG, "getData($fileName)")
-        val reader = getReadableFile()
-
-        if (cipher != null) {
-            val encryptedJson = getFileContents()
-            val vector = cipher.getVector()
-            val rawJson = cipher.decrypt(encryptedJson, vector)
-            return gson.fromJson(rawJson, rootType)
-        }
-
-        //Log.d(LOG_TAG, "reader: $reader")
-        //Log.d(LOG_TAG, "rootType: $rootType")
-
-        //val raw = getFileContents()
-        //Log.v(LOG_TAG, "raw: $raw")
-
-        return gson.fromJson(reader, rootType)
-    }
-
-    /**
      * Set the data to be stored.
      */
     fun setData(data: T) {
-        Log.i(LOG_TAG, "setData($fileName)")
         val writer = getWritableFile()
 
         if (cipher != null) {
@@ -136,6 +91,21 @@ class DocuStream<T : Any>(
         }
 
         writer.close()
+    }
+
+    /**
+     * Get the data from the top level element defined in the constructor.
+     */
+    fun getData(): T {
+        val reader = getReadableFile()
+
+        if (cipher != null) {
+            val encryptedJson = getFileContents()
+            val rawJson = cipher.decrypt(encryptedJson)
+            return gson.fromJson(rawJson, rootType)
+        }
+
+        return gson.fromJson(reader, rootType)
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.docustream.encryption
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.security.KeyPairGeneratorSpec
@@ -27,17 +28,13 @@ private const val LOG_TAG = "BasicKeyStore"
 
 private const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
-private const val RSA = "RSA"
-
 /**
  * The master pair is an RSA backed pair that encrypts/decrypts keys used for encryption
  */
+private const val MASTER_ENCRYPTION_TYPE = "RSA"
 private const val MASTER_PAIR = "MASTER_PAIR"
 
-//private const val SECRET = "SECRET"
-//private const val VECTOR = "VECTOR"
-
-
+@SuppressLint("VisibleForTests")
 class DataCipher(private val context: Context) : Scrambler {
 
     private val store = KeyStore.getInstance(ANDROID_KEYSTORE)
@@ -47,10 +44,8 @@ class DataCipher(private val context: Context) : Scrambler {
     private lateinit var secretKey: SecretKeySpec
 
     init {
-        Log.i(LOG_TAG, "init() ----------------------------------------")
         // Make sure we're dealing with application context
-        val applicationContext = context.applicationContext
-        if (context != applicationContext) {
+        if (context != context.applicationContext) {
             throw IllegalArgumentException("Context must be of application!")
         }
 
@@ -74,24 +69,16 @@ class DataCipher(private val context: Context) : Scrambler {
 
             // store the key for later use
             val secretString = Base64.encodeToString(secretBytes, Base64.NO_WRAP)
-            Log.d(LOG_TAG, "(generated) secretString: $secretString (byte hash: ${secretBytes.hashCode()})")
-            val secretEncryptedString = encryptKey(secretString, "secret")
+            val secretEncryptedString = encryptKey(secretString)
             keys.secret = secretEncryptedString
             keyDocument.setData(keys)
         } else {
             keys.secret?.let { encryptedSecretString ->
-                Log.d(LOG_TAG, "(from file) encryptedSecretString: $encryptedSecretString")
-
-                val decryptedSecretString = decryptKey(encryptedSecretString, "secret")
-
+                val decryptedSecretString = decryptKey(encryptedSecretString)
                 val secretBytes = Base64.decode(decryptedSecretString, Base64.NO_WRAP)
-                Log.d(LOG_TAG, "decryptedSecretString: $decryptedSecretString (byte hash: ${secretBytes.hashCode()})")
-
                 secretKey = SecretKeySpec(secretBytes, 0, secretBytes.size, "AES")
             }
         }
-
-        Log.i(LOG_TAG, "---------------------------------------- int()")
     }
 
     // TODO handle case where the certificate is expired
@@ -108,7 +95,7 @@ class DataCipher(private val context: Context) : Scrambler {
         end.add(Calendar.YEAR, 1)
 
         // Initialize a KeyPair generator using the the intended algorithm (in this example, RSA and the KeyStore.  This example uses the AndroidKeyStore.
-        val generator = KeyPairGenerator.getInstance(RSA, ANDROID_KEYSTORE)
+        val generator = KeyPairGenerator.getInstance(MASTER_ENCRYPTION_TYPE, ANDROID_KEYSTORE)
 
         // The KeyPairGeneratorSpec object is how parameters for your key pair are passed to the KeyPairGenerator
         val spec: AlgorithmParameterSpec
@@ -142,57 +129,46 @@ class DataCipher(private val context: Context) : Scrambler {
         val generator = KeyGenerator.getInstance("AES")
         generator.init(128)
         val key = generator.generateKey()
-
         return key.encoded
     }
 
+    /**
+     * Method that will generate random bytes that can be used as vector bytes. Make sure you
+     * save them after you used them successfully (using [setVector])
+     */
     override fun generateVector(): ByteArray {
-        //Log.i(LOG_TAG, "generateVectorBytes()")
-
         val bytes = ByteArray(16)
         val random = SecureRandom()
         random.nextBytes(bytes)
-
         return bytes
     }
 
+    /**
+     * Method for storing vector bytes that was used to encrypt (and store) data. The implementation
+     * makes sure the vectors are (at least) different from the previously stored.
+     */
     override fun setVector(plainBytes: ByteArray) {
-        //Log.i(LOG_TAG, "setVector(${plainBytes.size} [hash: ${plainBytes.hashCode()}])")
-
         val keys = keyDocument.getData()
 
         if (isNew(keys.vector, plainBytes)) {
-
             val byteString = Base64.encodeToString(plainBytes, Base64.NO_WRAP)
-            //Log.d(LOG_TAG, "(un-encrypted) byteString: $byteString (to save)")
-            val encryptedString = encryptKey(byteString, "vector")
-            //Log.d(LOG_TAG, "(encrypted) encryptedString: $encryptedString (to save)")
+            val encryptedString = encryptKey(byteString)
 
             keys.vector = encryptedString
             keyDocument.setData(keys)
         }
     }
 
-    override fun getVector(): ByteArray {
-        //Log.i(LOG_TAG, "getVector()")
-
+    private fun getVector(): ByteArray {
         val keys = keyDocument.getData()
-        //Log.v(LOG_TAG, keyDocument.getFileContents())
 
-        if (keys.vector.isNullOrEmpty()) {
-            //Log.v(LOG_TAG, "generateVectorBytes()")
-            throw IllegalStateException("Vector should not be null. Try generating it instead.")
+        keys.vector?.let { vector ->
+            val decryptedString = decryptKey(vector)
+            return Base64.decode(decryptedString, Base64.NO_WRAP)
         }
 
-        //Log.d(LOG_TAG, "keys.vector: ${keys.vector} (to-decrypt)")
-
-        val decryptedString = decryptKey(keys.vector!!, "vector")
-        //Log.d(LOG_TAG, "decryptedString: $decryptedString")
-
-        val vector = Base64.decode(decryptedString, Base64.NO_WRAP)
-        //Log.d(LOG_TAG, "vector.size: [${vector.size} [hash: ${vector.hashCode()}]")
-
-        return vector
+        // This is an implementation issue; vector should not be null at this point
+        throw IllegalStateException("Vector is null.")
     }
 
     @Throws(IllegalArgumentException::class)
@@ -200,14 +176,12 @@ class DataCipher(private val context: Context) : Scrambler {
         Log.i(LOG_TAG, "isNew(${newVectorBytes.hashCode()})")
 
         oldVector?.let { encryptedString ->
-            val decryptedString = decryptKey(encryptedString, "vector")
+            val decryptedString = decryptKey(encryptedString)
             val previousVector = decryptedString.toByteArray()
             Log.v(LOG_TAG, "previousVector.hashCode(): ${previousVector.hashCode()}")
 
             if (newVectorBytes.contentEquals(previousVector)) {
                 throw IllegalArgumentException("Bad implementation; can only store new bytes.")
-                //Log.e(LOG_TAG, "new and old bytes are the same; this is an implementation issue!")
-                //return false
             }
         }
 
@@ -217,6 +191,9 @@ class DataCipher(private val context: Context) : Scrambler {
 
     /**
      * Gives the public key. Can be used for third parties to encrypt data and securely send back.
+     *
+     * TODO: create mechanism that can sends this key and a third party encrypts data with it
+     * TODO: and later sends back
      */
     fun getPublic(): PublicKey {
         return store.getCertificate(MASTER_PAIR).publicKey
@@ -228,43 +205,43 @@ class DataCipher(private val context: Context) : Scrambler {
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    fun encryptKey(key: String, reason: String = "test"): String {
-        Log.i(LOG_TAG, "$reason:encryptKey($key)")
-
+    fun encryptKey(key: String): String {
         val masterKey = getPublic()
         masterCipher.init(Cipher.ENCRYPT_MODE, masterKey)
         val encrypted = masterCipher.doFinal(key.toByteArray())
-        val encryptedString = Base64.encodeToString(encrypted, Base64.NO_WRAP)
-        //Log.d(LOG_TAG, "encryptedString: $encryptedString (also encoded)")
-
-        return encryptedString
+        return Base64.encodeToString(encrypted, Base64.NO_WRAP)
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    fun decryptKey(encryptedKey: String, reason: String = "test"): String {
-        //Log.i(LOG_TAG, "decryptKey($encryptedKey) --------------------------------------------------")
-
+    fun decryptKey(encryptedKey: String): String {
         val masterKey = getPrivate()
         masterCipher.init(Cipher.DECRYPT_MODE, masterKey)
         val bytes = masterCipher.doFinal(Base64.decode(encryptedKey, Base64.NO_WRAP))
-        val decryptedString = String(bytes)
-        //Log.d(LOG_TAG, "decryptedString: $decryptedString")
-
-        //Log.i(LOG_TAG, "-------------------------------------------------- decryptKey($decryptedString)")
-        return decryptedString
+        return String(bytes)
     }
 
+    /**
+     * Method to encrypt data. The [vector] should be saved for the decryption process.
+     */
     override fun encrypt(raw: String, vector: ByteArray): String {
-        //Log.i(LOG_TAG, "encrypt($secretKey)")
-
         dataCipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(vector))
         val encrypted = dataCipher.doFinal(raw.toByteArray())
         return Base64.encodeToString(encrypted, Base64.NO_WRAP)
     }
 
-    override fun decrypt(encrypted: String, vector: ByteArray): String {
-        //Log.i(LOG_TAG, "decrypt(${vector.size})")
+    /**
+     * Method for decrypting data that was encrypted with this class.
+     *
+     * It's important that the vector that was used to encrypt this data has been stored. The last
+     * vector will be obtained internally. If they do not match; your data is lost.
+     */
+    override fun decrypt(encrypted: String): String {
+        val vector = getVector()
+        return decrypt(encrypted, vector)
+    }
 
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    fun decrypt(encrypted: String, vector: ByteArray): String {
         dataCipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(vector))
         val decryptedBytes = dataCipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP))
         return String(decryptedBytes)
