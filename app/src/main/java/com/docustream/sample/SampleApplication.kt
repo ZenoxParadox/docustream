@@ -6,7 +6,6 @@ import com.docustream.DocuStream
 import com.docustream.encryption.DataCipher
 import com.docustream.sample.model.User
 
-
 private const val LOG_TAG = "SampleApplication"
 
 /**

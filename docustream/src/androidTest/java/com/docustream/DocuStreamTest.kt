@@ -10,18 +10,19 @@ import com.docustream.model.Priority
 import com.docustream.model.Simple
 import com.docustream.model.SubItem
 import com.docustream.model.TinyObject
+import com.google.gson.GsonBuilder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.security.InvalidParameterException
 import java.security.KeyStore
 import javax.crypto.KeyGenerator
-
-
 
 /**
  * tests
@@ -49,10 +50,6 @@ class DocuStreamTest {
 //        val containerReset = storageContainer.reset()
 //        Log.d("setup", "containerReset: $containerReset")
 //
-//        val cipher = DataCipher(context.applicationContext)
-//        val removed = cipher.reset()
-//        Log.d("setup", "cipher reset. Output: [$removed]")
-
         // Remove all files
         val directory = context.filesDir
         Log.v("setup", "directory [${directory.name}]")
@@ -61,6 +58,10 @@ class DocuStreamTest {
             val removed = file.delete()
             Log.v("setup", "file [$name] removed [$removed]")
         }
+
+        val cipher = DataCipher(context.applicationContext)
+        val removed = cipher.reset()
+        Log.d("setup", "cipher reset. Output: [$removed]")
 
         Log.i("setup", "---------------------------------------- setup()")
     }
@@ -277,8 +278,8 @@ class DocuStreamTest {
         val cipher = DataCipher(context.applicationContext)
         val key = "1234567890"
 
-        val encryptedKey = cipher.encryptKey(key)
-        val decryptedValue = cipher.decryptKey(encryptedKey)
+        val encryptedKey = cipher.encryptAsymmetric(key)
+        val decryptedValue = cipher.decryptAsymmetric(encryptedKey)
 
         assertEquals(key, decryptedValue)
     }
@@ -608,5 +609,87 @@ class DocuStreamTest {
         assertFalse(foundIssues)
     }
 
+    /* ********** [ GsonBuilder specification and reason ] ********** */
+
+    @Test(expected = InvalidParameterException::class)
+    fun i1_gsonBuilderSpecificationNotMet() {
+        val builder = GsonBuilder()
+        DocuStream(context.applicationContext, builder = builder,rootType = Example::class.java)
+    }
+
+    @Test
+    fun i2_gsonBuilderSpecificationMet() {
+        val builder = GsonBuilder().disableHtmlEscaping()
+        DocuStream(context.applicationContext, builder = builder,rootType = Example::class.java)
+
+        // No assert, just not crash
+    }
+
+    @Test
+    fun i3_serializeNullWithoutEncryption() {
+        val storage = DocuStream(context.applicationContext, rootType = Container::class.java)
+        val container = storage.getData()
+
+        if (container.items == null) {
+            container.items = mutableListOf()
+        }
+
+        container.items?.let { items ->
+            items.add(SubItem("body one", TinyObject()))
+            items.add(SubItem("body two", TinyObject()))
+            items.add(SubItem("body three", TinyObject()))
+            items.add(SubItem("body four", TinyObject()))
+
+            val fifthObject = TinyObject()
+            fifthObject.count = 50
+            items.add(SubItem("body five", fifthObject))
+        }
+
+        // persist this
+        storage.setData(container)
+
+        // get a new instance
+        val newContainer = storage.getData()
+        assertNull(newContainer.items!![4].subsection?.asis)
+    }
+
+    @Test
+    fun i4_serializeNullWithEncryption() {
+        val cipher = DataCipher(context.applicationContext)
+        val storage = DocuStream(context.applicationContext, cipher = cipher, rootType = Container::class.java)
+        val container = storage.getData()
+
+        if (container.items == null) {
+            container.items = mutableListOf()
+        }
+
+        container.items?.let { items ->
+            items.add(SubItem("body one", TinyObject()))
+            items.add(SubItem("body two", TinyObject()))
+            items.add(SubItem("body three", TinyObject()))
+            items.add(SubItem("body four", TinyObject()))
+
+            val fifthObject = TinyObject()
+            fifthObject.count = 50
+            items.add(SubItem("body five", fifthObject))
+        }
+
+        // persist this
+        storage.setData(container)
+
+        // get a new instance
+        val newContainer = storage.getData()
+        assertNull(newContainer.items!![4].subsection?.asis)
+    }
+
+    /* ********** [ How type serialisation behaves ] ********** */
+
+    // enums
+
+    // dates
+
+    // inner classes
+
+    // etc..
 
 }

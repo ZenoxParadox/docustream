@@ -16,7 +16,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
-import java.security.spec.AlgorithmParameterSpec
+import java.security.spec.RSAKeyGenParameterSpec
 import java.util.Calendar
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -24,7 +24,7 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.security.auth.x500.X500Principal
 
-private const val LOG_TAG = "BasicKeyStore"
+private const val LOG_TAG = "DataCipher"
 
 private const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
@@ -51,9 +51,7 @@ class DataCipher(private val context: Context) : Scrambler {
 
         store.load(null)
 
-        if (!store.containsAlias(MASTER_PAIR)) {
-            initialize(MASTER_PAIR)
-        }
+        initialize(MASTER_PAIR)
 
         /*
         This keyDocument does NOT use a masterCipher. Instead it relies on the RSA pair to encrypt/decrypt
@@ -69,12 +67,12 @@ class DataCipher(private val context: Context) : Scrambler {
 
             // store the key for later use
             val secretString = Base64.encodeToString(secretBytes, Base64.NO_WRAP)
-            val secretEncryptedString = encryptKey(secretString)
+            val secretEncryptedString = encryptAsymmetric(secretString)
             keys.secret = secretEncryptedString
             keyDocument.setData(keys)
         } else {
             keys.secret?.let { encryptedSecretString ->
-                val decryptedSecretString = decryptKey(encryptedSecretString)
+                val decryptedSecretString = decryptAsymmetric(encryptedSecretString)
                 val secretBytes = Base64.decode(decryptedSecretString, Base64.NO_WRAP)
                 secretKey = SecretKeySpec(secretBytes, 0, secretBytes.size, "AES")
             }
@@ -86,19 +84,21 @@ class DataCipher(private val context: Context) : Scrambler {
     private fun initialize(masterName: String) {
         // Only one master pair can exist at once
         if (store.containsAlias(masterName)) {
+            Log.v(LOG_TAG, "skipping RSA masterpair.")
             return
-            //throw IllegalStateException("Already have a master pair (alias used: $masterName)")
         }
 
+        // TODO Research why this is -> what is a 'good' expirationtime?
         val start = Calendar.getInstance()
         val end = Calendar.getInstance()
-        end.add(Calendar.YEAR, 1)
+        //end.add(Calendar.YEAR, 1)
+        end.add(Calendar.SECOND, 1)
 
-        // Initialize a KeyPair generator using the the intended algorithm (in this example, RSA and the KeyStore.  This example uses the AndroidKeyStore.
+        // Initialize a KeyPairGenerator from the AndroidKeyStore
         val generator = KeyPairGenerator.getInstance(MASTER_ENCRYPTION_TYPE, ANDROID_KEYSTORE)
 
-        // The KeyPairGeneratorSpec object is how parameters for your key pair are passed to the KeyPairGenerator
-        val spec: AlgorithmParameterSpec
+        //  Object to pass parameters to the KeyPairGenerator
+        val rsaSpec = RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4)
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             val builder = KeyPairGeneratorSpec.Builder(context)
@@ -107,21 +107,24 @@ class DataCipher(private val context: Context) : Scrambler {
             builder.setSerialNumber(BigInteger.valueOf(1337))
             builder.setStartDate(start.time)
             builder.setEndDate(end.time)
+            builder.setAlgorithmParameterSpec(rsaSpec)
 
-            spec = builder.build()
+            generator.initialize(builder.build())
         } else {
             val builder = KeyGenParameterSpec.Builder(masterName, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-            builder.setCertificateSubject(X500Principal("CN=" + masterName))
-            builder.setDigests(KeyProperties.DIGEST_SHA256)
+            builder.setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
             builder.setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
-            builder.setCertificateSerialNumber(BigInteger.valueOf(1337))
+            builder.setDigests(KeyProperties.DIGEST_SHA512)
+
+//            builder.setCertificateSubject(X500Principal("CN=" + masterName))
+//            builder.setCertificateSerialNumber(BigInteger.valueOf(1337))
             builder.setCertificateNotBefore(start.time)
             builder.setCertificateNotAfter(end.time)
+            builder.setAlgorithmParameterSpec(rsaSpec)
 
-            spec = builder.build()
+            generator.initialize(builder.build())
         }
 
-        generator.initialize(spec)
         generator.generateKeyPair()
     }
 
@@ -152,7 +155,9 @@ class DataCipher(private val context: Context) : Scrambler {
 
         if (isNew(keys.vector, plainBytes)) {
             val byteString = Base64.encodeToString(plainBytes, Base64.NO_WRAP)
-            val encryptedString = encryptKey(byteString)
+            Log.d(LOG_TAG, "byteString: $byteString")
+            val encryptedString = encryptAsymmetric(byteString)
+            Log.d(LOG_TAG, "(encrypted) encryptedString: $encryptedString")
 
             keys.vector = encryptedString
             keyDocument.setData(keys)
@@ -163,7 +168,8 @@ class DataCipher(private val context: Context) : Scrambler {
         val keys = keyDocument.getData()
 
         keys.vector?.let { vector ->
-            val decryptedString = decryptKey(vector)
+            Log.d(LOG_TAG, "(encrypted) vector: $vector")
+            val decryptedString = decryptAsymmetric(vector)
             return Base64.decode(decryptedString, Base64.NO_WRAP)
         }
 
@@ -176,7 +182,7 @@ class DataCipher(private val context: Context) : Scrambler {
         Log.i(LOG_TAG, "isNew(${newVectorBytes.hashCode()})")
 
         oldVector?.let { encryptedString ->
-            val decryptedString = decryptKey(encryptedString)
+            val decryptedString = decryptAsymmetric(encryptedString)
             val previousVector = decryptedString.toByteArray()
             Log.v(LOG_TAG, "previousVector.hashCode(): ${previousVector.hashCode()}")
 
@@ -205,15 +211,14 @@ class DataCipher(private val context: Context) : Scrambler {
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    fun encryptKey(key: String): String {
+    fun encryptAsymmetric(key: String): String {
         val masterKey = getPublic()
         masterCipher.init(Cipher.ENCRYPT_MODE, masterKey)
         val encrypted = masterCipher.doFinal(key.toByteArray())
         return Base64.encodeToString(encrypted, Base64.NO_WRAP)
     }
 
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    fun decryptKey(encryptedKey: String): String {
+    fun decryptAsymmetric(encryptedKey: String): String {
         val masterKey = getPrivate()
         masterCipher.init(Cipher.DECRYPT_MODE, masterKey)
         val bytes = masterCipher.doFinal(Base64.decode(encryptedKey, Base64.NO_WRAP))

@@ -12,6 +12,7 @@ import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.nio.charset.StandardCharsets
+import java.security.InvalidParameterException
 
 private const val LOG_TAG = "DocuStream"
 private const val DEFAULT_DATA = "{}"
@@ -25,21 +26,42 @@ private const val DEFAULT_DATA = "{}"
  *      - OS Update; all of the sudden the RSA master key can differ.
  * - listeners -> what type? non-invasive method?
  *
+ * @property[T] the generic root type for the source object.
+ *
+ * @param[context] required for using system resources. Make sure it's a strong (long-lasting) context.
+ * @param[rootType] the type of the root object.
+ * @param[builder] (optional) The Gson Builder. Must have setting for HTML escaping disabled.
+ * @param[fileName] (optional) name for the file. When not provided it will use the name of the
+ * simple rootType name
+ * @param[cipher] (optional) the cipher to use to encrypt/decryptInternal the data. When not using the
+ * cipher, all data stored will be stored as a (plain text) json object.
+ * @constructor Creates an instance of the docustream. It's important to keep this a since instance
+ * throughout the app.
+ *
+ * @author Killian Bos
+ *
  * Created by Killian on 23/01/2018.
  */
 class DocuStream<T : Any>(
         context: Context,
         private val directory: File = context.filesDir,
         private val rootType: Class<T>,
+        private val builder: GsonBuilder = GsonBuilder().disableHtmlEscaping(),
         private val fileName: String = rootType.simpleName,
         private val cipher: Scrambler? = null) {
 
-    private val gson: Gson by lazy { GsonBuilder().disableHtmlEscaping().create() }
+    private val gson: Gson
 
     init {
         // Make sure we're dealing with application context
         if (context != context.applicationContext) {
             throw IllegalArgumentException("Context must be of application!")
+        }
+
+        gson = builder.create()
+
+        if (gson.htmlSafe()) {
+            throw InvalidParameterException("Gson instance must not escape html characters. ")
         }
     }
 

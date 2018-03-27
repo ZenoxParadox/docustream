@@ -23,10 +23,19 @@ android {
 }
 
 dokka {
-    outputFormat = 'javadoc'
+    outputFormat = 'gfm'
     outputDirectory = "$buildDir/javadoc"
-
     sourceDirs = files('src/main/java')
+
+    includes = [
+            'packages.md'
+    ]
+
+    packageOptions {
+        prefix = 'com.docustream.model'
+        suppress = true
+    }
+
 }
 
 dependencies {
