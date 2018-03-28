@@ -6,5 +6,7 @@ package com.docustream.model
 data class Example(
     val name: String = "default",
     val age: Int = -1,
-    var variable: String = "this value is from the default file (unchanged and untouched)"
+    var variable: String = "this value is from the default file (unchanged and untouched)",
+
+    var simple: Simple? = null
 )

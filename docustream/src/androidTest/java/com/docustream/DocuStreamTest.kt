@@ -2,6 +2,7 @@ package com.docustream
 
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
+import android.util.JsonToken
 import android.util.Log
 import com.docustream.encryption.DataCipher
 import com.docustream.model.Container
@@ -11,6 +12,9 @@ import com.docustream.model.Simple
 import com.docustream.model.SubItem
 import com.docustream.model.TinyObject
 import com.google.gson.GsonBuilder
+import com.google.gson.TypeAdapter
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonWriter
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.InvalidParameterException
 import java.security.KeyStore
+import java.util.Calendar
 import javax.crypto.KeyGenerator
 
 /**
@@ -684,11 +689,128 @@ class DocuStreamTest {
 
     /* ********** [ How type serialisation behaves ] ********** */
 
-    // enums
+    @Test
+    fun j1_customTypeWithoutTypeAdapter() {
+        val calendarIn = Calendar.getInstance()
+        calendarIn.set(Calendar.YEAR, 2000)
+        calendarIn.set(Calendar.MONTH, Calendar.APRIL)
+        calendarIn.set(Calendar.DAY_OF_MONTH, 20)
+
+        calendarIn.set(Calendar.HOUR, 14)
+        calendarIn.set(Calendar.MINUTE, 35)
+        calendarIn.set(Calendar.SECOND, 15)
+
+        val simple = Simple(contents = "changed into something else", calender = calendarIn)
+
+        val storage = DocuStream(context.applicationContext, rootType = Simple::class.java)
+        storage.setData(simple)
+
+        Log.v(LOG_TAG("j1-fileContents"), storage.getFileContents())
+
+        val builder = StringBuilder()
+        builder.append("{")
+        builder.append("\"calender\"")
+        builder.append(":")
+
+        // Notice complext storage
+        builder.append("{\"year\":2000,\"month\":3,\"dayOfMonth\":20,\"hourOfDay\":14,\"minute\":35,\"second\":15}")
+        builder.append(",")
+        builder.append("\"contents\"")
+        builder.append(":")
+        builder.append("\"changed into something else\"")
+        builder.append("}")
+
+        assertEquals(builder.toString(), storage.getFileContents())
+
+        val restoredSimple = storage.getData()
+        val calendarOut = restoredSimple.calender
+        assertEquals("changed into something else", restoredSimple.contents)
+
+        assertNotNull(calendarOut)
+        assertEquals(2000, calendarOut.get(Calendar.YEAR))
+        assertEquals(Calendar.APRIL, calendarOut.get(Calendar.MONTH))
+        assertEquals(20, calendarOut.get(Calendar.DAY_OF_MONTH))
+    }
+
+    class CalendarAdapter : TypeAdapter<Calendar>() {
+
+        override fun write(writer: JsonWriter, value: Calendar?) {
+            if (value == null) {
+                writer.nullValue()
+                return
+            }
+
+            writer.value(value.timeInMillis)
+        }
+
+        override fun read(reader: JsonReader): Calendar? {
+            if (reader.peek() == JsonToken.NULL) {
+                reader.nextNull()
+                return null
+            }
+
+            val calendar = Calendar.getInstance()
+            calendar.timeInMillis = reader.nextLong()
+            return calendar
+        }
+
+    }
+
+    @Test
+    fun j2_customTypeWithTypeAdapter() {
+        val gsonBuilder = GsonBuilder()
+        // Needs to be TypeHierarchy because Calendar is natively supported
+        gsonBuilder.registerTypeHierarchyAdapter(Calendar::class.java, CalendarAdapter())
+        gsonBuilder.disableHtmlEscaping()
+
+        val calendarIn = Calendar.getInstance()
+        calendarIn.set(Calendar.YEAR, 2000)
+        calendarIn.set(Calendar.MONTH, Calendar.APRIL)
+        calendarIn.set(Calendar.DAY_OF_MONTH, 20)
+
+        calendarIn.set(Calendar.HOUR, 14)
+        calendarIn.set(Calendar.MINUTE, 35)
+        calendarIn.set(Calendar.SECOND, 15)
+        calendarIn.set(Calendar.MILLISECOND, 0)
+
+        val simple = Simple(contents = "changed into something else", calender = calendarIn)
+
+        val storage = DocuStream(context.applicationContext, builder = gsonBuilder, rootType = Simple::class.java)
+        storage.setData(simple)
+
+        Log.v(LOG_TAG("j1-fileContents"), storage.getFileContents())
+
+        val builder = StringBuilder()
+        builder.append("{")
+        builder.append("\"calender\"")
+        builder.append(":")
+
+        // Notice simple (epoch) storage
+        builder.append("956241315000") // Notice it's NOT a string value!
+        builder.append(",")
+        builder.append("\"contents\"")
+        builder.append(":")
+        builder.append("\"changed into something else\"")
+        builder.append("}")
+
+        assertEquals(builder.toString(), storage.getFileContents())
+
+        val restoredSimple = storage.getData()
+        val calendarOut = restoredSimple.calender
+        assertEquals("changed into something else", restoredSimple.contents)
+
+        assertNotNull(calendarOut)
+        assertEquals(2000, calendarOut.get(Calendar.YEAR))
+        assertEquals(Calendar.APRIL, calendarOut.get(Calendar.MONTH))
+        assertEquals(20, calendarOut.get(Calendar.DAY_OF_MONTH))
+    }
+
 
     // dates
 
     // inner classes
+
+    // image or bitmap (Base64 encoded)
 
     // etc..
 
