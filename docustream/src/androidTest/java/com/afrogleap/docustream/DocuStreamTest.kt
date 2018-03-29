@@ -1,5 +1,7 @@
 package com.afrogleap.docustream
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.JsonToken
@@ -11,6 +13,9 @@ import com.afrogleap.docustream.model.Priority
 import com.afrogleap.docustream.model.Simple
 import com.afrogleap.docustream.model.SubItem
 import com.afrogleap.docustream.model.TinyObject
+import android.widget.ImageView
+import com.docustream.common.adapter.BitmapAdapter
+import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.TypeAdapter
 import com.google.gson.stream.JsonReader
@@ -28,6 +33,8 @@ import java.security.InvalidParameterException
 import java.security.KeyStore
 import java.util.Calendar
 import javax.crypto.KeyGenerator
+
+
 
 /**
  * tests
@@ -434,7 +441,7 @@ class DocuStreamTest {
 
         val data = storage.getData()
 
-        for(i in 0..20){
+        for (i in 0..20) {
             storage.setData(data)
             val rawData = storage.getFileContents()
             Log.v(LOG_TAG("g7-${fnumber(i)}"), rawData)
@@ -619,13 +626,13 @@ class DocuStreamTest {
     @Test(expected = InvalidParameterException::class)
     fun i1_gsonBuilderSpecificationNotMet() {
         val builder = GsonBuilder()
-        DocuStream(context.applicationContext, builder = builder,rootType = Example::class.java)
+        DocuStream(context.applicationContext, builder = builder, rootType = Example::class.java)
     }
 
     @Test
     fun i2_gsonBuilderSpecificationMet() {
         val builder = GsonBuilder().disableHtmlEscaping()
-        DocuStream(context.applicationContext, builder = builder,rootType = Example::class.java)
+        DocuStream(context.applicationContext, builder = builder, rootType = Example::class.java)
 
         // No assert, just not crash
     }
@@ -778,7 +785,7 @@ class DocuStreamTest {
         val storage = DocuStream(context.applicationContext, builder = gsonBuilder, rootType = Simple::class.java)
         storage.setData(simple)
 
-        Log.v(LOG_TAG("j1-fileContents"), storage.getFileContents())
+        Log.v(LOG_TAG("j2-fileContents"), storage.getFileContents())
 
         val builder = StringBuilder()
         builder.append("{")
@@ -805,13 +812,93 @@ class DocuStreamTest {
         assertEquals(20, calendarOut.get(Calendar.DAY_OF_MONTH))
     }
 
+    /* ********** [ Serializing Bitmaps is a little trickier ] ********** */
 
-    // dates
+    /*
+    When you use a Bitmap somewhere, the serialisation is done fine. It creates some sort of
+    ByteArray from the 'mBuffer' (inside Bitmap.java class) variable. When trying the reverse direction
+    Gson is attempting to re-create the Bitmap. However the constructor of the Bitmap is only to be
+    called with a native pointer (restriction from the platform).
 
-    // inner classes
+    The result is that in theory it can work, if only Gson would be able to read the mBuffer array
+    and somehow recreate this from the array. Therefore the unit-tests show that it could work; that
+    is, the fileSize and dimensions for example are the same. The bitmap is just not able to show.
 
-    // image or bitmap (Base64 encoded)
+    This is why it's important to manually perform the I/O to Gson by using a type-adapter (Bitmap
+    vs. Base64 encoded byte array).
+     */
 
-    // etc..
+    @Test
+    fun k1_bitmapWithoutTypeAdapter() {
+        val assetStream = context.assets.open("afl_logo.JPG")
+        val bitmap = BitmapFactory.decodeStream(assetStream)
+        val example = Example(bitmap = bitmap)
+        bitmap.recycle()
+
+        val storage = DocuStream(context.applicationContext, rootType = Example::class.java)
+        storage.setData(example)
+
+        Log.v(LOG_TAG("k1-fileContents"), storage.getFileContents())
+
+        val restoredExample = storage.getData()
+        val restoredBitmap = restoredExample.bitmap
+
+        assertNotNull(restoredBitmap)
+        assertEquals(bitmap.height, restoredBitmap?.height)
+        assertEquals(bitmap.width, restoredBitmap?.width)
+        assertEquals(bitmap.byteCount, restoredBitmap?.byteCount)
+
+        val imageView = ImageView(context)
+        imageView.setImageBitmap(restoredBitmap)
+    }
+
+    @Test
+    fun k2_Base64TypeAdapterWithoutEncryption() {
+        val gsonBuilder = GsonBuilder()
+        gsonBuilder.registerTypeAdapter(Bitmap::class.java, BitmapAdapter())
+        gsonBuilder.disableHtmlEscaping()
+
+        val assetStream = context.assets.open("afl_logo.JPG")
+        val bitmap = BitmapFactory.decodeStream(assetStream)
+        val example = Example(bitmap = bitmap)
+
+        val storage = DocuStream(context.applicationContext, builder = gsonBuilder, rootType = Example::class.java)
+        storage.setData(example)
+
+        val restoredExample = storage.getData()
+        val restoredBitmap = restoredExample.bitmap
+
+        assertNotNull(restoredBitmap)
+        assertEquals(bitmap.height, restoredBitmap?.height)
+        assertEquals(bitmap.width, restoredBitmap?.width)
+        assertEquals(bitmap.byteCount, restoredBitmap?.byteCount)
+
+        val imageView = ImageView(context)
+        imageView.setImageBitmap(restoredBitmap)
+    }
+
+    @Test
+    fun k3_default() {
+        val gson = Gson()
+
+        val assetStream = context.assets.open("afl_logo.JPG")
+        val bitmap = BitmapFactory.decodeStream(assetStream)
+
+        val example = Example(bitmap = bitmap)
+
+        val rawJson = gson.toJson(example, Example::class.java)
+        Log.v(LOG_TAG("k3-rawJson"), rawJson)
+
+        val restoredExample = gson.fromJson(rawJson, Example::class.java)
+        val restoredBitmap = restoredExample.bitmap
+
+        assertNotNull(restoredBitmap)
+        assertEquals(bitmap.height, restoredBitmap?.height)
+        assertEquals(bitmap.width, restoredBitmap?.width)
+        assertEquals(bitmap.byteCount, restoredBitmap?.byteCount)
+
+        val imageView = ImageView(context)
+        imageView.setImageBitmap(restoredBitmap)
+    }
 
 }

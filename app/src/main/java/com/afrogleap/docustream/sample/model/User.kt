@@ -1,5 +1,7 @@
 package com.afrogleap.docustream.sample.model
 
+import android.graphics.Bitmap
+
 /**
  * TODO
  *
@@ -8,7 +10,8 @@ package com.afrogleap.docustream.sample.model
 data class User(
         var name: String = "",
         var age: Int = 0,
-        var favoriteColor: String = ""
+        var favoriteColor: String = "",
+        var bitmap: Bitmap? = null
 )
 
 

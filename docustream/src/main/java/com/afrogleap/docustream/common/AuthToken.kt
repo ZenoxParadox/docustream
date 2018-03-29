@@ -4,6 +4,9 @@ import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /**
+ * Auth token object.
+ *
+ * Based on:
  * https://tools.ietf.org/html/rfc6749
  *
  * Created by Killian on 27/02/2018.

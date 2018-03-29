@@ -47,6 +47,20 @@
         android:layout_marginBottom="16dp"
         android:hint="Favorite color" />
 
+    <!-- Bitmap -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Bitmap" />
+
+    <ImageView
+        android:id="@+id/activity_main_bitmap"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="16dp"
+        android:background="#55cdcdcd"
+        android:scaleType="center" />
+
     <Button
         android:id="@+id/activity_main_save"
         android:layout_width="match_parent"

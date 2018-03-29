@@ -147,7 +147,9 @@ class DocuStream<T : Any>(
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     fun getFileContents(): String {
+        Log.i(LOG_TAG, "getFileContents()")
         val file = getFile()
+        Log.d(LOG_TAG, "file: $file")
 
         val builder = StringBuilder()
         for (line in file.readLines()) {
