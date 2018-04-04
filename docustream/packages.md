@@ -34,11 +34,11 @@ val stream = DocuStream(this, rootType = User::class.java, cipher = DataCipher(t
 The rest of the encryption is done behind the scenes. Each time you store your data (using `setData(T)`)
 the encryption is changed for you.
 
-# Package com.docustream.encryption
+# Package com.afrogleap.docustream.encryption
 
 The package containing ciphers. These will encrypt the data (the root object). You don't have to 
 encrypt your data.
 
-# Package com.docustream.common
+# Package com.afrogleap.docustream.common
 
 Common objects that you _could_ use in your object. For example an object to store an oAuth token.
