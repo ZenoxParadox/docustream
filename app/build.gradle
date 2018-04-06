@@ -24,7 +24,7 @@ android {
 def support = '27.1.0'
 
 dependencies {
-    compile project(path: ":docustream")
+    implementation project(path: ":docustream")
 
     // support
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"

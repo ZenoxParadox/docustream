@@ -17,29 +17,47 @@
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-def isReleaseBuild() {
-    return VERSION_NAME.contains("SNAPSHOT") == false
+enum ReleaseProfile {
+    NONE(null, false), // default
+    SNAPSHOT("https://oss.sonatype.org/content/repositories/snapshots/", false), // upload snapshot
+    RELEASE("https://oss.sonatype.org/service/local/staging/deploy/maven2/", true) // upload signed release
+
+    final String repository
+    final Boolean signRequired
+
+    ReleaseProfile(String url, boolean sign){
+        repository = url
+        signRequired = sign
+    }
+
+    static def getProfile(String profile) {
+        if (profile != null) {
+            for (ReleaseProfile item in values()) {
+                if (item.name().equalsIgnoreCase(profile)) {
+                    return item
+                }
+            }
+        }
+
+        return NONE
+    }
 }
 
-def getReleaseRepositoryUrl() {
-    return hasProperty('RELEASE_REPOSITORY_URL') ? RELEASE_REPOSITORY_URL
-            : "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-}
-
-def getSnapshotRepositoryUrl() {
-    return hasProperty('SNAPSHOT_REPOSITORY_URL') ? SNAPSHOT_REPOSITORY_URL
-            : "https://oss.sonatype.org/content/repositories/snapshots/"
-}
-
-def getRepositoryUsername() {
-    return hasProperty('NEXUS_USERNAME') ? NEXUS_USERNAME : ""
-}
-
-def getRepositoryPassword() {
-    return hasProperty('NEXUS_PASSWORD') ? NEXUS_PASSWORD : ""
-}
+def releaseProfile = ReleaseProfile.NONE
 
 afterEvaluate { project ->
+
+    System.out.println("======================")
+    if (project.hasProperty("profile")) {
+        releaseProfile = ReleaseProfile.getProfile(project.profile)
+    }
+    System.out.println("releaseProfile -> ${releaseProfile}")
+    System.out.println("======================")
+
+    if (releaseProfile == ReleaseProfile.NONE) {
+        return
+    }
+
     uploadArchives {
         repositories {
             mavenDeployer {
@@ -47,13 +65,23 @@ afterEvaluate { project ->
 
                 pom.groupId = GROUP
                 pom.artifactId = POM_ARTIFACT_ID
-                pom.version = VERSION_NAME
 
-                repository(url: getReleaseRepositoryUrl()) {
-                    authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
-                }
-                snapshotRepository(url: getSnapshotRepositoryUrl()) {
-                    authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
+                switch (releaseProfile) {
+                    case ReleaseProfile.RELEASE:
+                        pom.version = project.ext.pom_version
+
+                        repository(url: ReleaseProfile.RELEASE.repository) {
+                            authentication(userName: NEXUS_USERNAME, password: NEXUS_PASSWORD)
+                        }
+                        break
+                    case ReleaseProfile.SNAPSHOT:
+                        pom.version = project.ext.pom_version + "-SNAPSHOT"
+
+                        snapshotRepository(url: ReleaseProfile.SNAPSHOT.repository) {
+                            authentication(userName: NEXUS_USERNAME, password: NEXUS_PASSWORD)
+                        }
+
+                        break
                 }
 
                 pom.project {
@@ -88,7 +116,7 @@ afterEvaluate { project ->
     }
 
     signing {
-        required { isReleaseBuild() && gradle.taskGraph.hasTask("uploadArchives") }
+        required { releaseProfile.signRequired && gradle.taskGraph.hasTask("uploadArchives") }
         sign configurations.archives
     }
 
