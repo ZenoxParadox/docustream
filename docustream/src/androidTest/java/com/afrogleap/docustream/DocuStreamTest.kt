@@ -14,7 +14,7 @@ import com.afrogleap.docustream.model.Simple
 import com.afrogleap.docustream.model.SubItem
 import com.afrogleap.docustream.model.TinyObject
 import android.widget.ImageView
-import com.docustream.common.adapter.BitmapAdapter
+import com.afrogleap.docustream.common.adapter.BitmapAdapter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.TypeAdapter
