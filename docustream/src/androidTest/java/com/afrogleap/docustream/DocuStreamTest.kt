@@ -6,6 +6,8 @@ import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.JsonToken
 import android.util.Log
+import android.widget.ImageView
+import com.afrogleap.docustream.common.adapter.BitmapAdapter
 import com.afrogleap.docustream.encryption.DataCipher
 import com.afrogleap.docustream.model.Container
 import com.afrogleap.docustream.model.Example
@@ -13,8 +15,6 @@ import com.afrogleap.docustream.model.Priority
 import com.afrogleap.docustream.model.Simple
 import com.afrogleap.docustream.model.SubItem
 import com.afrogleap.docustream.model.TinyObject
-import android.widget.ImageView
-import com.docustream.common.adapter.BitmapAdapter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.TypeAdapter
@@ -42,7 +42,7 @@ import javax.crypto.KeyGenerator
  * Created by Killian on 24/01/2018.
  */
 @RunWith(AndroidJUnit4::class)
-class DocuStreamTest {
+class DocuStreamTest : BaseTest() {
 
     private val context = InstrumentationRegistry.getTargetContext()
 
@@ -76,14 +76,6 @@ class DocuStreamTest {
         Log.d("setup", "cipher reset. Output: [$removed]")
 
         Log.i("setup", "---------------------------------------- setup()")
-    }
-
-    private fun LOG_TAG(method: String): String {
-        return "DocuStreamTest-$method"
-    }
-
-    private fun fnumber(number: Int, size: Int = 2): String {
-        return String.format("%0${size}d", number)
     }
 
     /* ********** [initialize] ********** */

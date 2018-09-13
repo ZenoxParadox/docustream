@@ -116,15 +116,21 @@ class DocuStream<T : Any>(
      * Get the data from the top level element defined in the constructor.
      */
     fun getData(): T {
-        val reader = getReadableFile()
 
         if (cipher != null) {
             val encryptedJson = getFileContents()
             val rawJson = cipher.decrypt(encryptedJson)
+            // TODO Recover from empty rawJson
             return gson.fromJson(rawJson, rootType)
         }
 
-        return gson.fromJson(reader, rootType)
+        return try {
+            val reader = getReadableFile()
+            gson.fromJson(reader, rootType)
+        } catch (ise: IllegalStateException) {
+            Log.w(LOG_TAG, "Recovering object [$rootType] from ${ise.message}")
+            gson.fromJson(DEFAULT_DATA, rootType)
+        }
     }
 
     /**

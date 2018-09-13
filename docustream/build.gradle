@@ -39,11 +39,11 @@ dokka {
 def support = '27.1.0'
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.8.2'
+    implementation 'com.google.code.gson:gson:2.8.5'
 
     implementation "com.android.support:appcompat-v7:$support"
     testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'com.android.support.test:runner:1.0.1'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
 
     androidTestImplementation "com.android.support:support-annotations:$support"
 

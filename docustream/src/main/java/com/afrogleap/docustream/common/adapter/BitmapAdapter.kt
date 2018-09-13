@@ -1,4 +1,4 @@
-package com.docustream.common.adapter
+package com.afrogleap.docustream.common.adapter
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

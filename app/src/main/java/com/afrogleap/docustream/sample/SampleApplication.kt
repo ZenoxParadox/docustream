@@ -6,7 +6,7 @@ import android.util.Log
 import com.afrogleap.docustream.DocuStream
 import com.afrogleap.docustream.encryption.DataCipher
 import com.afrogleap.docustream.sample.model.User
-import com.docustream.common.adapter.BitmapAdapter
+import com.afrogleap.docustream.common.adapter.BitmapAdapter
 import com.google.gson.GsonBuilder
 
 private const val LOG_TAG = "SampleApplication"

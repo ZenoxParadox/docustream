@@ -17,10 +17,30 @@
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-enum ReleaseProfile {
-    NONE(null, false), // default
-    SNAPSHOT("https://oss.sonatype.org/content/repositories/snapshots/", false), // upload snapshot
-    RELEASE("https://oss.sonatype.org/service/local/staging/deploy/maven2/", true) // upload signed release
+def POM_NAME="DocuStream"
+def POM_PACKAGING="aar"
+
+def POM_DESCRIPTION="Storage of object that gets serialized and encrypted"
+
+def POM_URL="https://github.com/aFrogleap/docustream"
+def POM_SCM_URL="https://github.com/aFrogleap/docustream"
+def POM_SCM_CONNECTION="scm:git@github.com:afrogleap/docustream.git"
+def POM_SCM_DEV_CONNECTION="scm:git@github.com:afrogleap/docustream.git"
+
+def POM_LICENCE_NAME="MIT License"
+def POM_LICENCE_URL="https://opensource.org/licenses/MIT"
+def POM_LICENCE_DIST="repo"
+
+def POM_DEVELOPER_ID="ZenoxParadox"
+def POM_DEVELOPER_NAME="Killian Bos"
+
+def VERSION_NAME="0.0.3"
+def GROUP="com.afrogleap.docustream"
+def POM_ARTIFACT_ID="docustream"
+
+def isReleaseBuild() {
+    return VERSION_NAME.contains("SNAPSHOT") == false
+}
 
     final String repository
     final Boolean signRequired
