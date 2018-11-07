@@ -6,9 +6,10 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.Toast
 import com.afrogleap.docustream.sample.R
 import com.afrogleap.docustream.sample.SampleApplication
-import android.widget.ImageView
 
 
 private const val LOG_TAG = "MainActivity"
@@ -68,6 +69,8 @@ class MainActivity : Activity() {
 
             val rawContents = app.stream.getFileContents()
             Log.v(LOG_TAG, "rawContents: $rawContents")
+
+            Toast.makeText(this, "saved", Toast.LENGTH_SHORT).show()
         }
 
     }

@@ -5,6 +5,7 @@ import android.support.test.runner.AndroidJUnit4
 import android.util.Log
 import com.afrogleap.docustream.encryption.DataCipher
 import com.afrogleap.docustream.model.Nullable
+import com.afrogleap.docustream.model.Simple
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -45,6 +46,20 @@ class KotlinNullTest : BaseTest() {
         Log.d("setup", "cipher reset. Output: [$removed]")
 
         Log.i("setup", "---------------------------------------- setup()")
+    }
+
+    private fun getFile(directory: File, name: String): File {
+        if (!directory.isDirectory) {
+            throw IllegalArgumentException("directory param is not a directory")
+        }
+
+        for (file in directory.listFiles()) {
+            if (file.nameWithoutExtension == name) {
+                return file
+            }
+        }
+
+        throw IllegalStateException("Could not find file [$name]")
     }
 
     /* ********** [ problem description ] ********** */
@@ -115,18 +130,29 @@ class KotlinNullTest : BaseTest() {
         assertNotNull(data)
     }
 
-    private fun getFile(directory: File, name: String): File {
-        if (!directory.isDirectory) {
-            throw IllegalArgumentException("directory param is not a directory")
-        }
+    /* ********** [ this is the solution implemented ] ********** */
 
-        for (file in directory.listFiles()) {
-            if (file.nameWithoutExtension == name) {
-                return file
-            }
-        }
+    @Test
+    fun d1_malformedRecovery() {
+        val stream = DocuStream(context.applicationContext, rootType = Simple::class.java)
 
-        throw IllegalStateException("Could not find file [$name]")
+        val simple = Simple(contents = "normal valid json")
+        stream.setData(simple)
+
+        val fileContents = stream.getFileContents()
+        Log.v(LOG_TAG("d1_malformedRecovery"), fileContents)
+
+        // make the stored object null (invalid because it's not going be be JSON)
+        val directory = context.applicationContext.filesDir
+        val file = getFile(directory, "Simple")
+
+        val writer = PrintWriter(file)
+        writer.print("{\"calender\":{\"year\":2018,\"month\":10,\"dayOfMonthhourOfDay\":11,\"minute\":25,\"second\":32},\"contentsnormal valid json\"}") // This means that the file has invalid contents (NOT JSON)
+        writer.close()
+
+        // verify that we end up with a valid object
+        val data = stream.getData()
+        assertNotNull(data)
     }
 
 }

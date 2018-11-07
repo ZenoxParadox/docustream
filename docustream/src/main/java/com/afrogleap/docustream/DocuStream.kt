@@ -6,6 +6,7 @@ import android.util.Log
 import com.afrogleap.docustream.encryption.Scrambler
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonSyntaxException
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
@@ -96,6 +97,7 @@ class DocuStream<T : Any>(
     /**
      * Set the data to be stored.
      */
+    @Synchronized
     fun setData(data: T) {
         val writer = getWritableFile()
 
@@ -127,9 +129,14 @@ class DocuStream<T : Any>(
         return try {
             val reader = getReadableFile()
             gson.fromJson(reader, rootType)
-        } catch (ise: IllegalStateException) {
-            Log.w(LOG_TAG, "Recovering object [$rootType] from ${ise.message}")
-            gson.fromJson(DEFAULT_DATA, rootType)
+        } catch (e: Exception) {
+            when (e) {
+                is IllegalStateException, is JsonSyntaxException -> {
+                    Log.w(LOG_TAG, "Recovering object [$rootType] from ${e.message}")
+                    gson.fromJson(DEFAULT_DATA, rootType)
+                }
+                else -> throw e
+            }
         }
     }
 

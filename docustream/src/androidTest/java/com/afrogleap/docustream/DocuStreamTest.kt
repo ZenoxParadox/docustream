@@ -711,7 +711,7 @@ class DocuStreamTest : BaseTest() {
         builder.append("\"calender\"")
         builder.append(":")
 
-        // Notice complext storage
+        // Notice complex storage
         builder.append("{\"year\":2000,\"month\":3,\"dayOfMonth\":20,\"hourOfDay\":14,\"minute\":35,\"second\":15}")
         builder.append(",")
         builder.append("\"contents\"")
@@ -785,7 +785,7 @@ class DocuStreamTest : BaseTest() {
         builder.append(":")
 
         // Notice simple (epoch) storage
-        builder.append("956255715000") // Notice it's NOT a string value!
+        builder.append("956234115000") // Notice it's NOT a string value!
         builder.append(",")
         builder.append("\"contents\"")
         builder.append(":")
@@ -802,6 +802,7 @@ class DocuStreamTest : BaseTest() {
         assertEquals(2000, calendarOut.get(Calendar.YEAR))
         assertEquals(Calendar.APRIL, calendarOut.get(Calendar.MONTH))
         assertEquals(20, calendarOut.get(Calendar.DAY_OF_MONTH))
+        assertEquals(14, calendarOut.get(Calendar.HOUR_OF_DAY))
     }
 
     /* ********** [ Serializing Bitmaps is a little trickier ] ********** */
